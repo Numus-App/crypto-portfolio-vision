@@ -1,0 +1,68 @@
+name: Build & push BALANCES.MY PROJECT frontend to S3 (PROD env)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      AWS_S3_BUCKET: balances.my
+      AWS_REGION: us-east-1
+      CF_DISTRIBUTION_ID: E8BBI0A0FWT2M
+    permissions:
+      id-token: write
+      contents: read
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20 
+      
+            
+      - name: restore packages cache
+        uses: actions/cache/restore@v3
+        with:
+          path: | 
+            node_modules
+          key: npm-${{ hashFiles('**/package-lock.json') }} 
+          
+      - name: Set up GitHub Actions environment
+        run: |
+          npm install
+
+      - name: save packages cache
+        uses: actions/cache/save@v3
+        with:
+          path: | 
+            node_modules
+          key: npm-${{ hashFiles('**/package-lock.json') }}
+          
+      - name: Build project
+        run: |
+          npm run build 
+        
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::975050127120:role/CICD_numus
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Copy files to homepage bucket
+        run: |
+          aws s3 sync ./dist s3://${{ env.AWS_S3_BUCKET }} 
+          aws s3 sync ./src s3://${{ env.AWS_S3_BUCKET }}/src
+          
+      - name: invalidate old files 
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ env.CF_DISTRIBUTION_ID }} \
+            --paths "/*"
