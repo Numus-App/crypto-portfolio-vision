@@ -1,93 +1,106 @@
-import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { Loader2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
-const fetchAssetPrices = async (ids) => {
-  // Mock data for asset prices
-  const mockPrices = {
-    bitcoin: 50000,
-    ethereum: 3000,
-    tether: 1,
-  };
+const portfolios = [
+  {
+    name: 'Bitcoin Portfolio',
+    assets: [
+      { id: 'bitcoin', amount: 1.2, location: 'Binance', type: 'Exchange' },
+      { id: 'bitcoin', amount: 0.8, location: 'OKX', type: 'Exchange' },
+      { id: 'bitcoin', amount: 1.5, location: 'Trezor', type: 'Hardware Wallet' },
+      { id: 'bitcoin', amount: 0.7, location: 'KuCoin', type: 'Exchange' },
+      { id: 'bitcoin', amount: 1.26, location: 'Bitcoin Network', type: 'Blockchain' },
+    ]
+  },
+  {
+    name: 'Ethereum Portfolio',
+    assets: [
+      { id: 'ethereum', amount: 7.2, location: 'MetaMask', type: 'Software Wallet' },
+      { id: 'ethereum', amount: 5.8, location: 'KuCoin', type: 'Exchange' },
+      { id: 'ethereum', amount: 8.3, location: 'Ethereum Mainnet', type: 'Blockchain' },
+      { id: 'ethereum', amount: 5.2, location: 'Binance', type: 'Exchange' },
+      { id: 'ethereum', amount: 7.6, location: 'OKX', type: 'Exchange' },
+    ]
+  },
+  {
+    name: 'USDT Portfolio',
+    assets: [
+      { id: 'tether', amount: 150000, location: 'Tron Network', type: 'Blockchain' },
+      { id: 'tether', amount: 100000, location: 'Ethereum Network', type: 'Blockchain' },
+      { id: 'tether', amount: 80000, location: 'Binance Smart Chain', type: 'Blockchain' },
+      { id: 'tether', amount: 75680, location: 'Binance', type: 'Exchange' },
+      { id: 'tether', amount: 60000, location: 'KuCoin', type: 'Exchange' },
+      { id: 'bitcoin', amount: 1.5, location: 'Binance', type: 'Exchange' },
+      { id: 'bitcoin', amount: 1.34, location: 'KuCoin', type: 'Exchange' },
+      { id: 'ethereum', amount: 4, location: 'Binance', type: 'Exchange' },
+      { id: 'ethereum', amount: 3, location: 'KuCoin', type: 'Exchange' },
+    ]
+  }
+];
 
-  return new Promise((resolve) => {
-    setTimeout(() => resolve({ data: ids.map(id => ({ id, priceUsd: mockPrices[id] })) }), 1000);
-  });
-};
+const COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#C7F464', '#FF8C94', '#91A6FF'];
 
 const Portfolio = () => {
-  const [portfolio, setPortfolio] = useState([
-    { id: 'bitcoin', amount: 1.2, location: 'Binance', type: 'Exchange', purchasePrice: 30000, currentPrice: 0 },
-    { id: 'bitcoin', amount: 0.8, location: 'OKX', type: 'Exchange', purchasePrice: 35000, currentPrice: 0 },
-    { id: 'bitcoin', amount: 1.5, location: 'Trezor', type: 'Hardware Wallet', purchasePrice: 40000, currentPrice: 0 },
-    { id: 'bitcoin', amount: 0.7, location: 'KuCoin', type: 'Exchange', purchasePrice: 45000, currentPrice: 0 },
-    { id: 'bitcoin', amount: 1.22, location: 'Bitcoin Network', type: 'Blockchain', purchasePrice: 50000, currentPrice: 0 },
-    { id: 'bitcoin', amount: 3.5, location: 'Binance', type: 'Exchange', purchasePrice: 55000, currentPrice: 0 },
-    { id: 'ethereum', amount: 8.0, location: 'MetaMask', type: 'Software Wallet', purchasePrice: 2000, currentPrice: 0 },
-    { id: 'ethereum', amount: 6.5, location: 'KuCoin', type: 'Exchange', purchasePrice: 2500, currentPrice: 0 },
-    { id: 'ethereum', amount: 9.2, location: 'Ethereum Mainnet', type: 'Blockchain', purchasePrice: 3000, currentPrice: 0 },
-    { id: 'ethereum', amount: 5.8, location: 'Binance', type: 'Exchange', purchasePrice: 3500, currentPrice: 0 },
-    { id: 'ethereum', amount: 5.0, location: 'OKX', type: 'Exchange', purchasePrice: 4000, currentPrice: 0 },
-    { id: 'ethereum', amount: 30.0, location: 'Binance', type: 'Exchange', purchasePrice: 4500, currentPrice: 0 },
-    { id: 'tether', amount: 20000, location: 'Tron Network', type: 'Blockchain', purchasePrice: 1, currentPrice: 0 },
-    { id: 'tether', amount: 40000, location: 'Gate.io', type: 'Exchange', purchasePrice: 1, currentPrice: 0 },
-    { id: 'tether', amount: 57000, location: 'Binance', type: 'Exchange', purchasePrice: 1, currentPrice: 0 },
-    { id: 'tether', amount: 40000, location: 'Trezor', type: 'Hardware Wallet', purchasePrice: 1, currentPrice: 0 },
-  ]);
-
-  const [showDetails, setShowDetails] = useState(false);
-
-  const assetIds = [...new Set(portfolio.map(item => item.id))];
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['assetPrices', assetIds],
-    queryFn: () => fetchAssetPrices(assetIds),
+  const [activeTab, setActiveTab] = useState(portfolios[0].name);
+  const [prices, setPrices] = useState({
+    bitcoin: null,
+    ethereum: null,
+    tether: 1,
   });
 
-  const pieChartData = useMemo(() => {
-    if (!data || !data.data) return [];
-    const assetTotals = portfolio.reduce((totals, item) => {
-      const asset = data.data.find(a => a.id === item.id);
-      if (asset) {
-        const value = item.amount * parseFloat(asset.priceUsd);
-        totals[item.id] = (totals[item.id] || 0) + value;
-      }
-      return totals;
+  useEffect(() => {
+    const wsBTC = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker');
+    const wsETH = new WebSocket('wss://stream.binance.com:9443/ws/ethusdt@ticker');
+
+    wsBTC.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      setPrices(prev => ({ ...prev, bitcoin: parseFloat(data.c) }));
+    };
+
+    wsETH.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      setPrices(prev => ({ ...prev, ethereum: parseFloat(data.c) }));
+    };
+
+    return () => {
+      wsBTC.close();
+      wsETH.close();
+    };
+  }, []);
+
+  const portfolioValues = useMemo(() => {
+    if (!prices.bitcoin || !prices.ethereum) return {};
+
+    return portfolios.reduce((acc, portfolio) => {
+      acc[portfolio.name] = portfolio.assets.reduce((total, item) => {
+        const price = prices[item.id];
+        return total + (price ? item.amount * price : 0);
+      }, 0);
+      return acc;
     }, {});
-    return Object.entries(assetTotals).map(([id, value]) => ({
-      name: id,
-      value,
-    }));
-  }, [data, portfolio]);
+  }, [prices]);
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+  const totalValue = useMemo(() => 
+    Object.values(portfolioValues).reduce((sum, value) => sum + value, 0),
+  [portfolioValues]);
 
-  if (isLoading) return (
-    <div className="flex justify-center items-center h-full">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
-  );
-  if (error) return <div className="text-sm font-bold text-red-600">Error: {error.message}</div>;
+  const pieChartData = useMemo(() => 
+    Object.entries(portfolioValues).map(([name, value]) => ({ name, value })),
+  [portfolioValues]);
 
-  const calculateTotalValue = () => {
-    if (!data || !data.data) return 0;
-    return portfolio.reduce((total, item) => {
-      const asset = data.data.find(a => a.id === item.id);
-      if (asset) {
-        return total + item.amount * parseFloat(asset.priceUsd);
-      }
-      return total;
-    }, 0);
-  };
+  if (prices.bitcoin === null || prices.ethereum === null) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <Card className="h-full flex flex-col">
       <CardHeader>
-        <CardTitle className="text-xl font-bold text-primary">Your Portfolio</CardTitle>
+        <CardTitle className="text-xl font-bold text-primary">Portfolio Overview</CardTitle>
       </CardHeader>
       <CardContent className="flex-grow overflow-hidden flex flex-col">
         <div className="flex-grow flex flex-col md:flex-row">
@@ -103,70 +116,78 @@ const Portfolio = () => {
                   fill="#8884d8"
                   paddingAngle={5}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 >
                   {pieChartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
-                <Legend />
+                <Tooltip formatter={(value) => `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} />
+                <Legend verticalAlign="middle" align="right" layout="vertical" />
               </PieChart>
             </ResponsiveContainer>
           </div>
           <div className="md:w-1/2 flex flex-col justify-center items-center p-4">
             <div className="text-2xl font-bold text-primary mb-4">
-              Total Value: ${calculateTotalValue().toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              Total Value: ${totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </div>
-            <Button onClick={() => setShowDetails(!showDetails)}>
-              {showDetails ? 'Hide Details' : 'Show Details'}
-            </Button>
           </div>
         </div>
-        {showDetails && (
-          <div className="mt-4 overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Asset</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Value (USD)</TableHead>
-                  <TableHead>Cost Basis</TableHead>
-                  <TableHead>Profit/Loss</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data && data.data && portfolio.map((item, index) => {
-                  const asset = data.data.find(a => a.id === item.id);
-                  const currentPrice = asset ? parseFloat(asset.priceUsd) : 0;
-                  const value = item.amount * currentPrice;
-                  const costBasis = item.amount * item.purchasePrice;
-                  const profitLoss = value - costBasis;
-                  const profitLossPercentage = ((value / costBasis) - 1) * 100;
-                  return (
-                    <TableRow key={index}>
-                      <TableCell>{asset ? asset.id : item.id}</TableCell>
-                      <TableCell>{item.amount.toFixed(4)}</TableCell>
-                      <TableCell>{item.location}</TableCell>
-                      <TableCell>{item.type}</TableCell>
-                      <TableCell>${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
-                      <TableCell>${costBasis.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
-                      <TableCell className={profitLoss >= 0 ? 'text-green-500' : 'text-red-500'}>
-                        ${profitLoss.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                        ({profitLossPercentage.toFixed(2)}%)
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-4">
+          <TabsList className="grid w-full grid-cols-3">
+            {portfolios.map((portfolio) => (
+              <TabsTrigger key={portfolio.name} value={portfolio.name} className="text-sm">
+                {portfolio.name}
+                <span className="ml-2 text-xs font-semibold">
+                  ${portfolioValues[portfolio.name]?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {portfolios.map((portfolio) => (
+            <TabsContent key={portfolio.name} value={portfolio.name}>
+              <PortfolioTable portfolio={portfolio} prices={prices} />
+            </TabsContent>
+          ))}
+        </Tabs>
       </CardContent>
     </Card>
   );
 };
+
+const PortfolioTable = ({ portfolio, prices }) => (
+  <ScrollArea className="h-[300px] w-full rounded-md border">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Location</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead className="font-bold text-primary">Amount</TableHead>
+          <TableHead>Value (USD)</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {portfolio.assets.map((item, assetIndex) => {
+          const price = prices[item.id] || 0;
+          const value = item.amount * price;
+          return (
+            <TableRow key={assetIndex}>
+              <TableCell>{item.location}</TableCell>
+              <TableCell>{item.type}</TableCell>
+              <TableCell className={cn(
+                "font-mono text-sm",
+                item.id === 'bitcoin' && "text-orange-500 font-bold",
+                item.id === 'ethereum' && "text-blue-500 font-bold",
+                item.id === 'tether' && "text-green-500 font-bold"
+              )}>
+                {item.amount.toFixed(4)} {item.id === 'bitcoin' ? 'BTC' : item.id === 'ethereum' ? 'ETH' : 'USDT'}
+              </TableCell>
+              <TableCell>${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  </ScrollArea>
+);
 
 export default Portfolio;
